@@ -15,24 +15,17 @@ logger = logging.getLogger(__name__)
 TOKEN = BOT_TOKEN
 bot = Bot(token=TOKEN)
 
+"""Клавиатуры для бота"""
 reply_keyboard_cancel = [['Отмена']]
-
 reply_keyboard_buy_products = [['КУПИТЬ', 'НАЗАД', 'УДАЛИТЬ ТОВАР']]
-
 reply_keyboard = [['МЕНЮ', 'ТОВАРЫ']]
-
 reply_keyboard_menu = [['КОРЗИНА', 'ИЗБРАННЫЕ ТОВАРЫ', 'МОИ ТОВАРЫ'],
                        ['ДОБАВИТЬ ТОВАР', 'НАЗАД']]
-
 reply_keyboard_buy = [['продукты', 'техника', 'инструменты'],
                       ['книги', 'другое', 'НАЗАД']]
-
 reply_keyboard_favorites_and_basket = [['ДОБАВИТЬ В КОРЗИНУ', 'ДОБАВИТЬ В ИЗБРАННОЕ', 'НАЗАД']]
-
 reply_keyboard_add_product = [['ЗАКОНЧИТЬ ДОБАВЛЕНИЕ']]
-
 reply_keyboard_back = [['НАЗАД']]
-
 reply_keyboard_delete = [['УДАЛИТЬ', 'НАЗАД']]
 
 
@@ -47,6 +40,7 @@ markup_delete = ReplyKeyboardMarkup(reply_keyboard_delete, one_time_keyboard=Fal
 markup_back = ReplyKeyboardMarkup(reply_keyboard_back, one_time_keyboard=False, resize_keyboard=True)
 markup_buy_products = ReplyKeyboardMarkup(reply_keyboard_buy_products, one_time_keyboard=False, resize_keyboard=True)
 
+"""вспомогательные переменные"""
 category_of_products = ['technic', 'food', 'book', 'tools', 'other']
 dict_category_of_products = {'техника': 'technic',
                              'продукты': 'food',
@@ -54,12 +48,11 @@ dict_category_of_products = {'техника': 'technic',
                              'инструменты': 'tools',
                              'другое': 'other'}
 category_of_products_ru = ['продукты', 'техника', 'инструменты', 'книги', 'другое']
-
 back_count = [0, 0, 0, 0, 0, 0]
 
 
 def add_user(update, context):
-    """Добавление с проверкой регистрации пользователя"""
+    """Функция добавляет нового пользователя"""
     db_sess = db_session.create_session()
     already_added = False
     if len(db_sess.query(User).all()) == 0:
@@ -89,8 +82,12 @@ def add_user(update, context):
 
 
 def start(update, context):
+    """Запускает бота и приветствует пользователя"""
     db_session.global_init("db/shop_db.db")
     update.message.reply_text(f"Привет, {update.message.from_user.first_name}, я бот магазин", reply_markup=markup)
+    update.message.reply_text(f"/Этот бот позволяет проматривать и сохранять товары других пользователей. "
+                              f" Для управления используй кнопки внизу экрана/",
+                              reply_markup=markup)
     add_user(update, context)
 
 
@@ -100,6 +97,7 @@ def menu(update, context):
 
 
 def buy_products(update, context):
+    """Функция имитирует функцию покупки, удаляя все товары из корзины"""
     db_sess = db_session.create_session()
     user = db_sess.query(User).filter(User.telegram_id == update.message.from_user.id).first()
     user.shopping_cart = None
@@ -109,11 +107,13 @@ def buy_products(update, context):
 
 
 def change_basket(update, context):
+    """Функция принимает товар, который пользователь выбрал для удаления"""
     global ad_pr, del_product, del_from
     update.message.reply_text('напишите название товара который хотите удалить', reply_markup=markup_cancel)
     del_product = 1
 
 
+"""вспомогательные переменные"""
 del_product = 0
 ad_pr = []
 product_to_del = ''
@@ -122,6 +122,7 @@ ff = 0
 
 
 def basket(update, context):
+    """Функция выводит товары находящиеся в корзине"""
     global ad_pr, del_product, del_from, ff
     db_sess = db_session.create_session()
 
@@ -137,9 +138,9 @@ def basket(update, context):
         """товары выводятся в порядке добавления"""
         a = ''
         for products_id in shopping_cart:
-            for product in db_sess.query(Products).filter(Products.id == products_id):
-                ad_pr.append(product.title)
-                a += product.title + '\n'
+            for products in db_sess.query(Products).filter(Products.id == products_id):
+                ad_pr.append(products.title)
+                a += products.title + '\n'
         update.message.reply_text(f"{a}")
         back_count[4] = 1
     else:
@@ -148,6 +149,7 @@ def basket(update, context):
 
 
 def selected_products(update, context):
+    """Функция выводит товары находящиеся в разделе 'Избранное' """
     global ad_pr, del_product, del_from, ff
     update.message.reply_text('Товары в избранном:', reply_markup=markup_cancel)
     db_sess = db_session.create_session()
@@ -157,12 +159,11 @@ def selected_products(update, context):
         del_from = update.message.text
         ff = 1 if del_from == 'КОРЗИНА' else 2
         elected_products = list(map(int, str(user.elected_products).split(';')))
-        """товары выводятся в порядке добавления"""
         a = ''
         for products_id in elected_products:
-            for product in db_sess.query(Products).filter(Products.id == products_id):
-                ad_pr.append(product.title)
-                a += product.title + '\n'
+            for products in db_sess.query(Products).filter(Products.id == products_id):
+                ad_pr.append(products.title)
+                a += products.title + '\n'
         update.message.reply_text(f"{a}")
         update.message.reply_text('напишите название товара который хотите удалить')
         del_product = 1
@@ -173,34 +174,36 @@ def selected_products(update, context):
 
 
 def delete_add(update, context):
+    """Функция показывает пользователю выбраный для удаления товар"""
     global del_product, ad_pr, product_to_del
     product_to_del = update.message.text
     update.message.reply_text('товар:', reply_markup=markup_delete)
     db_sess = db_session.create_session()
-    for product in db_sess.query(Products).all():
-        if product.title == update.message.text:
-            if product.image is not None:
+    for products in db_sess.query(Products).all():
+        if products.title == update.message.text:
+            if products.image is not None:
                 update.message.reply_photo(
-                    photo=open(f"files/{product.image}", 'rb'),
-                    caption=f"{product.title} \n"
+                    photo=open(f"files/{products.image}", 'rb'),
+                    caption=f"{products.title} \n"
                             f"-----------------------------------------------------------------------------------"
                             f"------------------ \n"
-                            f"{product.description} \n"
+                            f"{products.description} \n"
                             f"-----------------------------------------------------------------------------------"
                             f"------------------ \n"
-                            f"Цена - {product.cost}")
+                            f"Цена - {products.cost}")
             else:
-                update.message.reply_text(f"{product.title} \n"
+                update.message.reply_text(f"{products.title} \n"
                                           f"---------------------------------------------------------------------"
                                           f"-------------------------------- \n"
-                                          f"{product.description} \n"
+                                          f"{products.description} \n"
                                           f"---------------------------------------------------------------------"
                                           f"-------------------------------- \n"
-                                          f"Цена - {product.cost}")
+                                          f"Цена - {products.cost}")
     del_product = 0
 
 
 def delete(update, context):
+    """Функция удаляет товар"""
     global ad_pr, product_to_del, del_from
     product_to_delete = product_to_del
     db_sess = db_session.create_session()
@@ -245,40 +248,42 @@ def user_products(update, context):
     update.message.reply_text('Мои товары:', reply_markup=markup_menu)
     db_sess = db_session.create_session()
     user = db_sess.query(User).filter(User.telegram_id == update.message.from_user.id).first()
-    for product in db_sess.query(Products).filter(Products.seller_id == user.id):
-        if product.image is not None:
+    for products in db_sess.query(Products).filter(Products.seller_id == user.id):
+        if products.image is not None:
             update.message.reply_photo(
-                photo=open(f"files/{product.image}", 'rb'),
-                caption=f"{product.title} \n"
+                photo=open(f"files/{products.image}", 'rb'),
+                caption=f"{products.title} \n"
                         f"-----------------------------------------------------------------------------------"
                         f"------------------ \n"
-                        f"{product.description} \n"
+                        f"{products.description} \n"
                         f"-----------------------------------------------------------------------------------"
                         f"------------------ \n"
-                        f"Цена - {product.cost}")
+                        f"Цена - {products.cost}")
         else:
-            update.message.reply_text(f"{product.title} \n"
+            update.message.reply_text(f"{products.title} \n"
                                       f"---------------------------------------------------------------------"
                                       f"-------------------------------- \n"
-                                      f"{product.description} \n"
+                                      f"{products.description} \n"
                                       f"---------------------------------------------------------------------"
                                       f"-------------------------------- \n"
-                                      f"Цена - {product.cost}")
+                                      f"Цена - {products.cost}")
 
 
 def buy(update, context):
+    """Функция предлагает пользователю выбрать категорию товаров"""
     update.message.reply_text('ТОВАРЫ:', reply_markup=markup_buy)
     back_count[1] = 1
 
 
+"""вспомогательные переменные"""
 added_product = ''
-
 add_product_flag = 0
 name_product = []
 category_name = ''
 
 
 def product(update, context):
+    """Ввывод товаров из выбранной категории"""
     global add_product_flag, name_product, category_name
     if category_name not in category_of_products:
         category_name = dict_category_of_products[update.message.text]
@@ -286,8 +291,8 @@ def product(update, context):
     product_names = []
     name_product = []
     db_sess = db_session.create_session()
-    for product in db_sess.query(Products).filter(Products.category == category_name):
-        product_names.append((product.title, product.cost))
+    for products in db_sess.query(Products).filter(Products.category == category_name):
+        product_names.append((products.title, products.cost))
     a = ''
     for i in product_names:
         name_product.append(i[0])
@@ -299,32 +304,33 @@ def product(update, context):
 
 
 def product_add(update, context):
+    """Выбор товара из предложенных"""
     global add_product_flag, added_product, category_name
     added_product = update.message.text
     back_count[3] = 1
     if added_product != 'Отмена':
         update.message.reply_text('товар:', reply_markup=markup_favorites_and_basket)
         db_sess = db_session.create_session()
-        for product in db_sess.query(Products).filter(Products.category == category_name):
-            if product.title == update.message.text:
-                if product.image is not None:
+        for products in db_sess.query(Products).filter(Products.category == category_name):
+            if products.title == update.message.text:
+                if products.image is not None:
                     update.message.reply_photo(
-                        photo=open(f"files/{product.image}", 'rb'),
-                        caption=f"{product.title} \n"
+                        photo=open(f"files/{products.image}", 'rb'),
+                        caption=f"{products.title} \n"
                                 f"-----------------------------------------------------------------------------------"
                                 f"------------------ \n"
-                                f"{product.description} \n"
+                                f"{products.description} \n"
                                 f"-----------------------------------------------------------------------------------"
                                 f"------------------ \n"
-                                f"Цена - {product.cost}")
+                                f"Цена - {products.cost}")
                 else:
-                    update.message.reply_text(f"{product.title} \n"
+                    update.message.reply_text(f"{products.title} \n"
                                               f"---------------------------------------------------------------------"
                                               f"-------------------------------- \n"
-                                              f"{product.description} \n"
+                                              f"{products.description} \n"
                                               f"---------------------------------------------------------------------"
                                               f"-------------------------------- \n"
-                                              f"Цена - {product.cost}")
+                                              f"Цена - {products.cost}")
     else:
         update.message.reply_text('ТОВАРЫ:', reply_markup=markup_buy)
         category_name = ''
@@ -335,11 +341,12 @@ def product_add(update, context):
 
 
 def add_to_basket(update, context):
-    product_name = added_product
+    """Функция добавляет товар в корзину"""
+    products_name = added_product
     db_sess = db_session.create_session()
     product_id = 0
-    for product in db_sess.query(Products).filter(Products.title == product_name):
-        product_id = product.id
+    for products in db_sess.query(Products).filter(Products.title == products_name):
+        product_id = products.id
     user = db_sess.query(User).filter(User.telegram_id == update.message.from_user.id).first()
     if user.shopping_cart is None or len(str(user.shopping_cart)) == 0:
         user.shopping_cart = product_id
@@ -361,11 +368,12 @@ def add_to_basket(update, context):
 
 
 def add_to_selected(update, context):
-    product_name = added_product
+    """Функция добавляет товар в избранное"""
+    products_name = added_product
     db_sess = db_session.create_session()
     product_id = 0
-    for product in db_sess.query(Products).filter(Products.title == product_name):
-        product_id = product.id
+    for products in db_sess.query(Products).filter(Products.title == products_name):
+        product_id = products.id
     user = db_sess.query(User).filter(User.telegram_id == update.message.from_user.id).first()
     if user.elected_products is None or len(str(user.elected_products)) == 0:
         user.elected_products = product_id
@@ -387,6 +395,7 @@ def add_to_selected(update, context):
 
 
 def back(update, context):
+    """Обработка кнопок назад"""
     if back_count[0] == 1 and back_count[4] == 0 and back_count[5] == 0:
         update.message.reply_text('Основное окно:', reply_markup=markup)
         back_count[0] = 0
@@ -417,19 +426,20 @@ def finish_adding(update, context):
     back_count[2] = 0
 
 
-def image_resize(object):
-    fon = Image.open('files/fone.jpg')
-    img = Image.open(object)
+def image_resize(photo):
+    """Функция меняет соотношение сторон изображения добавля белый фон"""
+    fon = Image.open('files/fon.jpg')
+    img = Image.open(photo)
     w, h = img.size
     if h >= w:
         fon = fon.resize((h, h))
         fon.paste(img, ((h - w) // 2, 0))
         new_image = fon
-        new_image.save(object)
+        new_image.save(photo)
 
 
 def image_handler(update, context):
-    """Зарузка фотографий"""
+    """Функция сохраняет полученную от пользавотеля фотографию"""
     global file_name
     db_sess = db_session.create_session()
     photo_id = 0
@@ -440,43 +450,40 @@ def image_handler(update, context):
     file = update.message.photo[-1].file_id
     obj = context.bot.get_file(file)
     obj.download(f'files/product_image_{photo_id + 1}.jpg')
-    q = f'files/product_image_{photo_id + 1}.jpg'
-    image_resize(q)
+    photo = f'files/product_image_{photo_id + 1}.jpg'
+    image_resize(photo)
     file_name = f"product_image_{photo_id + 1}.jpg"
     update.message.reply_text("Фото успешно сохранено")
 
 
-def add_product_to_db(product_name, cash, description, category, file_name, update, context):
-    """Добаыление товара в дб"""
+def add_product_to_db(product_name1, cash1, description1, category1, file_name1, update, context):
+    """Добаыление товара в базу дынных"""
     db_sess = db_session.create_session()
     user_id = ''
     for user in db_sess.query(User).filter(User.user_name == f'{update.message.from_user.first_name}'):
         user_id = user.id
     """Проверка есть ли категория указанная пользователем среди заранее предусмотренных"""
-    if category not in category_of_products:
+    if category1 not in category_of_products:
         product_category = 'other'
     else:
-        product_category = category
+        product_category = category1
 
     prod = Products()
-    prod.title = product_name
-    prod.description = description
-    prod.cost = cash
-    prod.image = file_name
+    prod.title = product_name1
+    prod.description = description1
+    prod.cost = cash1
+    prod.image = file_name1
     prod.category = product_category
     prod.seller_id = user_id
     db_sess.add(prod)
     db_sess.commit()
-    product_name = ''
-    cash = ''
-    description = ''
-    category = ''
-    file_name = ''
+    product_name1, cash1, description1, category1, file_name1 = '', '', '', '', ''
     update.message.reply_text('Товар успешно добавлен', reply_markup=markup_menu)
     update.message.reply_text('МЕНЮ:', reply_markup=markup_menu)
     back_count[2] = 0
 
 
+"""вспомогательные переменные"""
 add_par = 0
 step_add = [0, 0, 0, 0, 0]
 product_name = ''
@@ -487,6 +494,7 @@ file_name = ''
 
 
 def add_product(update, context):
+    """Начало диалога"""
     global add_par
     update.message.reply_text('Добавление товара:', reply_markup=markup_add)
     back_count[2] = 1
@@ -495,15 +503,15 @@ def add_product(update, context):
 
 
 def add_product_add(update, context):
-    """Некоректный ввод обработан, но если вместо фото отправить текст, то программа падает!!!(исправлю потом)"""
+    """Диалог добавления своего товара"""
     global step_add, add_par, product_name, cash, description, category
     if step_add[0] == 0:
         product_name = update.message.text
         if product_name is not None:
             rename = False
             db_sess = db_session.create_session()
-            for product in db_sess.query(Products).all():
-                if product.title == product_name:
+            for product_title in db_sess.query(Products).all():
+                if product_title.title == product_name:
                     rename = True
             if rename is False:
                 update.message.reply_text('Напишите описание')
@@ -527,7 +535,8 @@ def add_product_add(update, context):
             image_handler(update, context)
             update.message.reply_text('Выберите категорию товара: \n'
                                       'technic, food, tools, book, other \n'
-                                      '/если ваша категория отсутствует, товар автоматически будет добавлен в "другое"/')
+                                      '/если ваша категория отсутствует, товар автоматически будет добавлен в "другое"/'
+                                      )
             step_add[2] = 1
         else:
             update.message.reply_text('Фото небыло полученно, отправте его снова, без каких-либо подписей')
@@ -553,6 +562,7 @@ step_transition = [0, 0, 0, 0, 0, 0]
 
 
 def transition(update, context):
+    """Функция переделывает сообщение в команды"""
     global del_product, ff
     if update.message.text == 'МЕНЮ' and step_transition[0] == 0:
         menu(update, context)
@@ -616,7 +626,6 @@ def main():
     dp.add_handler(CommandHandler("start", start))
     text_handler = MessageHandler(Filters.text & ~Filters.command, transition)
     dp.add_handler(text_handler)
-    """Это для загрузки фото"""
     dp.add_handler(MessageHandler(Filters.photo, add_product_add))
 
     updater.start_polling()
